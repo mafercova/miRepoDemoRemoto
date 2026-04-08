@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Auth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #121212;
+            color: #fff;
+        }
+        .container {
+            max-width: 350px;
+            margin: auto;
+            padding: 25px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rbga(255,255,255,0.1);
+        }
+        input, button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 12px;
+            box-sizing: border-box;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input {
+            background: #333;
+            color: #fff;
+        }
+        input::placeholder { color: #bbb;}
+
+        #loginForm button {
+            background: #4CAF50;
+            color: white;
+        }
+        #loginForm button:hover {
+            background: #45a049;
+        }
+
+        #signupForm button {
+            background: #0069d6;
+        }
+
+        .toggle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .toggle-container span {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 55px;
+            height:30px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider{
+            position: absolute;
+            cursor: pointer;
+            top: 0; left:0; right:0; bottom: 0;
+            background-color: #4CAF50;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before{
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #007BFF;
+        }
+        input:checked + .slider:before{
+            transform: translateX(25px);
+        }
+
+        form { display: none;}
+        .active { display: block;}
+    </style>
+</head>
+<body>
+
+    <h1>Supabase Authentication</h1>
+
+    <div class="container">
+        <div class="toggle-container">
+            <span>Login</span>
+            <label class="switch">
+                <input type="checkbox" id="toggleAuth">
+                <span class="slider"></span>
+            </label>
+            <span>Sign Up</span>
+        </div>
+
+        <form id="loginForm" action="/login" method="POST" class="active">
+            <input type="email" name="email" placeholder="E-mail" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+
+        <form id="signupForm" action="/signup" method="POST">
+            <input type="email" name="email" placeholder="E-mail" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+    </div>
+
+    <script>
+        const toggleAuth = document.getElementById("toggleAuth");
+        const loginForm = document.getElementById("loginForm");
+        const signupForm = document.getElementById("signupForm");
+
+        toggleAuth.addEventListener("change", () => {
+            if (toggleAuth.checked) {
+                loginForm.classList.remove("active");
+                signupForm.classList.add("active");
+            } else {
+                signupForm.classList.remove("active");
+                loginForm.classList.add("active");
+            }
+        });
+    </script>
+    
+</body>
+</html>
