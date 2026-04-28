@@ -25,9 +25,8 @@ app.post("login", (req,res) => {
         res.cookie("token", token, {
             httpOnly: true,
             secure: false,
-            sameSite: "strict",
-            maxAge: 3600000
-        });
+            sameSite: "Lax"   
+            });
         return res.json({message: "Login exitoso"})
     }
     return res.status(401).json({message:"Crdenciales invalidas"});
@@ -36,7 +35,7 @@ app.post("login", (req,res) => {
 app.get("/perfil",auth,(req,res)=>{
     res.json({
         message:"Eres un usuario protegido",
-        user: req.username 
+        user: req.user
     });
 });
 
