@@ -14,12 +14,7 @@ const app = express();
 const REDIS_URL = "rediss://default:gQAAAAAAAcL1AAIgcDIyOWZiMzUwZTg5OWQ0NzJlODU2YWIxYTUwMGI4MjE4ZQ@able-bug-115445.upstash.io:6379";
 const pubClient = createClient({ url: REDIS_URL });
 const subClient = pubClient.duplicate();
-
-app.use(cors({ origin: "*", credentials: true }));
-app.use(express.json());
-app.use(cookieParser());
-
-app.use(session({
+const sessionMiddleware = session({
     store: new RedisStore({ 
         client: pubClient,
         prefix: "sess:" 
@@ -32,12 +27,20 @@ app.use(session({
         secure: false,
         maxAge: 3600000 
     }
-}));
+});
+
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
+
+app.use(sessionMiddleware);
 
 const server = http.createServer(app);
 const io = new Server(server, { 
-    cors: { origin: "*", credentials: true } 
+    cors: { origin: true, credentials: true } 
 });
+
+io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
     console.log("Conectado a Redis Remoto");
@@ -56,6 +59,14 @@ app.post('/login', (req, res) => {
 });
 
 io.on('connection', async (socket) => {
+    const username = socket.request.session?.username;
+
+    if (!username) {
+        socket.emit('auth_error', 'Debes iniciar sesión antes de conectarte al chat');
+        socket.disconnect(true);
+        return;
+    }
+
     try {
         const history = await pubClient.lRange('chat_shared', 0, -1);
         socket.emit('server_history', history.map(m => JSON.parse(m)));
@@ -63,7 +74,7 @@ io.on('connection', async (socket) => {
 
     socket.on('client_message', async (data) => {
         const newMessage = { 
-            user: data.user, 
+            user: username, 
             text: data.text, 
             time: new Date().toLocaleTimeString(),
             id: Date.now() 
