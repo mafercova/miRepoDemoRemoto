@@ -1,97 +1,120 @@
-import { useState, useEffect, useRef } from 'react';
-import io from 'socket.io-client';
+import React, { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import axios from 'axios';
+import './App.css';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4002';
 
 function App() {
-  // 1. Dile que aquí ponga TU IP y el puerto 4001
-  const [serverUrl, setServerUrl] = useState("http://10.200.30.251:4001"); 
-  const [username, setUsername] = useState("");
-  const [isLogged, setIsLogged] = useState(false);
-  const [message, setMessage] = useState("");
-  const [chat, setChat] = useState([]);
+  const [username, setUsername] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
   const socketRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    // Solo conectar cuando el login sea exitoso
-    if (isLogged && socketRef.current) {
-      socketRef.current.on('server_history', (h) => setChat(h));
-      socketRef.current.on('server_message', (m) => setChat(prev => [...prev, m]));
-      
-      return () => {
-        socketRef.current.off('server_history');
-        socketRef.current.off('server_message');
-      };
-    }
-  }, [isLogged]);
+    if (isLoggedIn && !socketRef.current) {
+      socketRef.current = io(API_URL, {
+        withCredentials: true
+      });
 
-  const handleLogin = async () => {
-    if (username && serverUrl) {
-      try {
-        // CORREGIDO: Se agregaron las comillas invertidas `` para la URL
-        await axios.post(`${serverUrl}/login`, 
-            { username }, 
-            { withCredentials: true }
-        );
-        
-        // Conectar el socket después del login
-        socketRef.current = io(serverUrl, { withCredentials: true });
-        setIsLogged(true);
-      } catch (err) {
-        console.error(err);
-        alert("Error en login. ¿Revisaste que la IP y el Puerto sean correctos?");
+      socketRef.current.on('server_history', (history) => {
+        setMessages(history);
+      });
+
+      socketRef.current.on('server_message', (message) => {
+        setMessages(prev => [...prev, message]);
+      });
+
+      socketRef.current.on('auth_error', (error) => {
+        alert(error);
+        setIsLoggedIn(false);
+        setUsername('');
+      });
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
-    }
-  };
+    };
+  }, [isLoggedIn, API_URL]);
 
-  const sendMessage = (e) => {
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (message.trim() && socketRef.current) {
-      socketRef.current.emit('client_message', { user: username, text: message });
-      setMessage("");
+    if (!username.trim()) return;
+
+    try {
+      await axios.post(`${API_URL}/login`, { username }, { withCredentials: true });
+      setIsLoggedIn(true);
+    } catch (err) {
+      alert('Error al iniciar sesión');
     }
   };
 
-  if (!isLogged) {
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !socketRef.current) return;
+
+    socketRef.current.emit('client_message', { text: newMessage });
+    setNewMessage('');
+  };
+
+  if (!isLoggedIn) {
     return (
-      <div style={{ padding: '50px' }}>
-        <h1>Fase 2: Conectar al Servidor de mi Amigo</h1>
-        <label>Dirección del Servidor:</label>
-        <input 
-          placeholder="Ejemplo: http://192.168.1.15:4001" 
-          value={serverUrl} 
-          onChange={(e) => setServerUrl(e.target.value)} 
-          style={{ width: '100%', marginBottom: '10px', padding: '8px' }}
-        />
-        <br />
-        <input 
-            placeholder="Tu nombre de usuario..." 
-            onChange={(e) => setUsername(e.target.value)} 
-            style={{ padding: '8px', marginRight: '10px' }}
-        />
-        <button onClick={handleLogin} style={{ padding: '8px' }}>Entrar al Chat</button>
+      <div className="App">
+        <div className="join-container">
+          <form onSubmit={handleLogin}>
+            <h1>Chat MSG</h1>
+            <input
+              type="text"
+              placeholder="Ingresa tu nombre"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <button type="submit">Entrar</button>
+          </form>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Sesión de: {username}</h2>
-      <p style={{ fontSize: '0.8em', color: 'gray' }}>Conectado a: {serverUrl}</p>
-      <div style={{ border: '2px solid green', height: '300px', overflowY: 'auto', padding: '10px', background: '#f0f0f0' }}>
-        {chat.map((m) => (
-          <p key={m.id}><b>{m.user}:</b> {m.text}</p>
-        ))}
+    <div className="App">
+      <div className="chat-container">
+        <div className="chat-main">
+          <div className="messages">
+            {messages.map((msg) => (
+              <div
+                key={msg.id ?? `${msg.user}-${msg.time}-${msg.text}`}
+                className={`message ${msg.user === username ? 'own' : ''}`}
+              >
+                <span className="message-user">{msg.user}</span>
+                <span className="message-text">{msg.text}</span>
+                <span className="message-time">{msg.time}</span>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+          <form onSubmit={handleSendMessage} className="message-form">
+            <input
+              type="text"
+              placeholder="Escribe un mensaje..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+            />
+            <button type="submit">Enviar</button>
+          </form>
+        </div>
       </div>
-      <form onSubmit={sendMessage} style={{ marginTop: '10px' }}>
-        <input 
-            value={message} 
-            onChange={(e) => setMessage(e.target.value)} 
-            style={{ width: '80%', padding: '8px' }}
-            placeholder="Escribe un mensaje..."
-        />
-        <button type="submit" style={{ padding: '8px' }}>Enviar</button>
-      </form>
     </div>
   );
 }
+
 export default App;

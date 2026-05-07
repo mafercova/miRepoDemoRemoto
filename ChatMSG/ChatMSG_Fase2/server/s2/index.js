@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -11,25 +13,34 @@ const { RedisStore } = require('connect-redis');
 
 const app = express();
 
-const REDIS_URL = "rediss://default:gQAAAAAAAcL1AAIgcDIyOWZiMzUwZTg5OWQ0NzJlODU2YWIxYTUwMGI4MjE4ZQ@able-bug-115445.upstash.io:6379";
+const REDIS_URL = process.env.REDIS_URL;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const COOKIE_NAME = process.env.COOKIE_NAME || 'chatmsg_session';
+
 const pubClient = createClient({ url: REDIS_URL });
 const subClient = pubClient.duplicate();
+
+pubClient.on('error', (err) => console.error('Redis Pub Client Error:', err));
+subClient.on('error', (err) => console.error('Redis Sub Client Error:', err));
+
 const sessionMiddleware = session({
-    store: new RedisStore({ 
+    store: new RedisStore({
         client: pubClient,
-        prefix: "sess:" 
+        prefix: "sess:"
     }),
-    secret: 'secreto-muy-seguro',
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { 
-        httpOnly: true, 
+    name: COOKIE_NAME,
+    cookie: {
+        httpOnly: true,
         secure: false,
-        maxAge: 3600000 
+        maxAge: 3600000
     }
 });
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -37,10 +48,12 @@ app.use(sessionMiddleware);
 
 const server = http.createServer(app);
 const io = new Server(server, { 
-    cors: { origin: true, credentials: true } 
+    cors: { origin: CLIENT_ORIGIN, credentials: true } 
 });
 
-io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
+io.use((socket, next) => {
+    sessionMiddleware(socket.request, socket.request.res || {}, next);
+});
 
 Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
     console.log("Conectado a Redis Remoto");
@@ -84,5 +97,5 @@ io.on('connection', async (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 4003;
+const PORT = process.env.PORT || 4002;
 server.listen(PORT, () => console.log('Servidor en puerto ' + PORT));
